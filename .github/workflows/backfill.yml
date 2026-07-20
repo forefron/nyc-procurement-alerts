@@ -1,0 +1,32 @@
+name: Backfill alerts (manual)
+
+on:
+  workflow_dispatch: {}   # run by hand from the Actions tab whenever you want a backfill
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Backfill the last 5 days of opportunities
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FIRST_RUN_LOOKBACK_DAYS: "5"
+        run: python3 fetcher.py
+
+      - name: Save state (so nothing ever posts twice)
+        run: |
+          git config user.name "alerts-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A state.json feed.json
+          git diff --cached --quiet || git commit -m "backfill state [skip ci]"
+          git push
